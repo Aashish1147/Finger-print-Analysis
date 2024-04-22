@@ -1,28 +1,25 @@
 import os
 import cv2
+from tkinter import Tk, filedialog
 
-def choose_image(directory):
-    print("Choose an image:")
-    counter = 1
-    for file in os.listdir(directory):
-        print(f"{counter}. {file}")
-        counter += 1
+# Initialize Tkinter
+root = Tk()
+root.withdraw()  # Hide the main window
 
-    choice = int(input("Enter the number of the image: "))
-    chosen_file = os.listdir(directory)[choice - 1]
-    image_path = os.path.join(directory, chosen_file)
-    return cv2.imread(image_path), chosen_file
+# Ask the user to choose an image from the Altered directory
+print("Please select an image from the Altered directory.")
+file_path = filedialog.askopenfilename(initialdir=r"C:\Users\DELL\OneDrive\Desktop\Python project gp11\Finger print analysis\archive\SOCOFing\SOCOFing\Altered\Altered-Hard", title="Select an Image", filetypes=(("Image files", "*.BMP;*.bmp;*.tif;*.TIF"), ("All files", "*.*")))
 
-# Directory paths for sample and fingerprint images
-sample_directory = r"C:\Users\DELL\OneDrive\Desktop\Python project gp11\Finger print analysis"
-fingerprint_directory = r"C:\Users\DELL\OneDrive\Desktop\Python project gp11\Finger print analysis"
+if not file_path:
+    print("No file selected.")
+    exit()
 
-# Choose the sample image
-sample, sample_file = choose_image(sample_directory)
+# Read the sample image
+sample = cv2.imread(file_path)
 
 # Check if the sample image is loaded correctly
-if sample is None:
-    print("Error: Unable to read sample image")
+if sample is None or sample.size == 0:
+    print(f"Error: Unable to read or empty image at {file_path}")
 else:
     # Initialize SIFT detector
     sift = cv2.SIFT_create()
@@ -30,13 +27,15 @@ else:
     # Detect keypoints and compute descriptors for the sample image
     keypoints_1, descriptors_1 = sift.detectAndCompute(sample, None)
 
-    # Choose the fingerprint image
-    fingerprint_image, fingerprint_file = choose_image(fingerprint_directory)
+    best_score = 0
+    filename = None
+    image = None
+    kp1, kp2, mp = None, None, None 
 
-    # Check if the chosen fingerprint image is loaded correctly
-    if fingerprint_image is not None:
-        # Convert image to correct depth (if needed)
-        fingerprint_image = cv2.convertScaleAbs(fingerprint_image)
+    # Loop through the Real directory to find the best match
+    real_dir = r"C:\Users\DELL\OneDrive\Desktop\Python project gp11\Finger print analysis\archive\SOCOFing\SOCOFing\Real"
+    for file in os.listdir(real_dir):
+        fingerprint_image = cv2.imread(os.path.join(real_dir, file))
 
         # Detect keypoints and compute descriptors for the fingerprint image
         keypoints_2, descriptors_2 = sift.detectAndCompute(fingerprint_image, None)
@@ -52,14 +51,21 @@ else:
         
         keypoints = min(len(keypoints_1), len(keypoints_2))
 
-        best_score = len(match_points) / keypoints * 100
-        print(f"BEST MATCH : {sample_file} with {fingerprint_file}")
-        print(f"Score : {best_score}")
+        if len(match_points) / keypoints * 100 > best_score:
+            best_score = len(match_points) / keypoints * 100
+            filename = file
+            image = fingerprint_image
+            kp1, kp2, mp = keypoints_1, keypoints_2, match_points
 
-        result = cv2.drawMatches(sample, keypoints_1, fingerprint_image, keypoints_2, match_points, None)
+    if filename:
+        print("BEST MATCH : " + str(filename))
+        print("Score : " + str(best_score))
+
+        result = cv2.drawMatches(sample, kp1, image, kp2, mp, None)
+        result = cv2.resize(result , None , fx = 5 , fy =5)
 
         cv2.imshow("Result", result)
         cv2.waitKey(0)  # Wait until a key is pressed
         cv2.destroyAllWindows()  # Close all OpenCV windows
     else:
-        print(f"Error: Unable to read chosen fingerprint image '{fingerprint_file}'")
+        print("No match found in the Real directory.")
